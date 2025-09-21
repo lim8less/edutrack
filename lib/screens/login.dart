@@ -59,21 +59,34 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _handleLogin() async {
-    final credential = await _firebaseService.signInWithEmailAndPassword(
-      email: _emailController.text.trim(),
-      password: _passwordController.text,
-    );
+    try {
+      final credential = await _firebaseService.signInWithEmailAndPassword(
+        email: _emailController.text.trim(),
+        password: _passwordController.text,
+      );
 
-    if (credential?.user != null) {
-      // Get user data to determine role
-      final appUser = await _firebaseService.getUserDocument(credential!.user!.uid);
-      if (appUser != null && mounted) {
-        NavigationHelper.navigateToDashboard(context, appUser.role);
+      // Check if user was signed in (either through credential or currentUser)
+      final currentUser = _firebaseService.currentUser;
+      if ((credential?.user != null || currentUser != null) && mounted) {
+        // Get user data to determine role
+        final userId = credential?.user?.uid ?? currentUser!.uid;
+        final appUser = await _firebaseService.getUserDocument(userId);
+        if (appUser != null) {
+          NavigationHelper.navigateToDashboard(context, appUser.role);
+        } else {
+          setState(() {
+            _errorMessage = 'Unable to load user data. Please try again.';
+          });
+        }
       } else {
         setState(() {
-          _errorMessage = 'Unable to load user data. Please try again.';
+          _errorMessage = 'Sign in failed. Please try again.';
         });
       }
+    } catch (e) {
+      setState(() {
+        _errorMessage = _getErrorMessage(e.toString());
+      });
     }
   }
 

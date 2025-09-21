@@ -59,6 +59,39 @@ class FirebaseService {
       throw e;
     } catch (e) {
       print('Unexpected error during sign in: $e');
+      // Handle specific type casting errors
+      if (e.toString().contains('PigeonUserDetails') || 
+          e.toString().contains('List<Object?>')) {
+        // Try to get current user anyway if auth succeeded
+        try {
+          final currentUser = _auth.currentUser;
+          if (currentUser != null) {
+            // Update last login time
+            await updateUserLastLogin(currentUser.uid);
+            
+            // Check if user document exists, create if it doesn't
+            final userDoc = await getUserDocument(currentUser.uid);
+            if (userDoc == null) {
+              print('User document not found, creating one...');
+              try {
+                await createUserDocument(
+                  uid: currentUser.uid,
+                  email: currentUser.email ?? email,
+                  name: currentUser.displayName ?? 'User',
+                  role: UserRole.student, // Default role
+                );
+                print('User document created during login');
+              } catch (docError) {
+                print('Failed to create user document during login: $docError');
+              }
+            }
+            return null; // We'll handle this in the UI
+          }
+        } catch (docError) {
+          print('Failed to handle post-auth tasks: $docError');
+        }
+        throw Exception('Authentication service temporarily unavailable. Please try again.');
+      }
       throw e;
     }
   }
